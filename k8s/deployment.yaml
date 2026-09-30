@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: demo-app
-          image: tom-ludwig/instrumentation-test:0.0.0-1
+          image: ghcr.io/tom-ludwig/otel-kyma-instrumentation-evaluation:0.0.1-golang
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

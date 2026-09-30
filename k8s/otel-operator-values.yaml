@@ -1,0 +1,20 @@
+manager:
+  collectorImage:
+    repository: otel/opentelemetry-collector-k8s
+
+  resources:
+    limits:
+      memory: "512Mi"
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+
+  autoInstrumentation:
+    go:
+      enabled: true
+
+admissionWebhooks:
+  certManager:
+    enabled: true
+  autoGenerateCert:
+    enabled: false

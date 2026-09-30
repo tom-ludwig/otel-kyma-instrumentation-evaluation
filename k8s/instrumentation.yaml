@@ -1,0 +1,19 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: demo-instrumentation
+  namespace: demo
+spec:
+  exporter:
+    # Go auto-instrumentation uses otlp/http-protobuf by default, so 4318 (HTTP) is required; not 4317 (gRPC)
+    endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  go:
+    env:
+      - name: OTEL_GO_AUTO_TARGET_EXE
+        value: /demo-app

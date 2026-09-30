@@ -1,4 +1,7 @@
 manager:
+  featureGatesMap:
+    operator.networkpolicy: false
+    operand.networkpolicy: false
   collectorImage:
     repository: otel/opentelemetry-collector-k8s
 

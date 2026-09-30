@@ -1,0 +1,29 @@
+crds:
+  enabled: true
+
+webhook:
+  # Keep timeout well under the 15s Gardener limit to avoid remediator flagging
+  timeoutSeconds: 10
+  # Tell Gardener's remediator to leave the webhook pod alone
+  podLabels:
+    remediation.webhook.shoot.gardener.cloud/exclude: "true"
+  validatingWebhookConfiguration:
+    # Exclude Gardener-managed system namespaces (best-practice pattern per Gardener docs)
+    namespaceSelector:
+      matchExpressions:
+        - key: "cert-manager.io/disable-validation"
+          operator: "NotIn"
+          values:
+            - "true"
+        - key: gardener.cloud/purpose
+          operator: NotIn
+          values:
+            - kube-system
+
+  mutatingWebhookConfiguration:
+    namespaceSelector:
+      matchExpressions:
+        - key: gardener.cloud/purpose
+          operator: NotIn
+          values:
+            - kube-system

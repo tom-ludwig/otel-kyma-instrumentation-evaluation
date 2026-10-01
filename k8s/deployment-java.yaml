@@ -79,6 +79,8 @@ spec:
         value: none
       - name: OTEL_LOGS_EXPORTER
         value: none
+      - name: OTEL_INSTRUMENTATION_HTTP_SERVER_IGNORE_URLS
+        value: /healthz
 ---
 apiVersion: apps/v1
 kind: Deployment

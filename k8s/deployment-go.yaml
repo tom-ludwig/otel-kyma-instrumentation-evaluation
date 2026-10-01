@@ -1,37 +1,53 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+  labels:
+    istio-injection: enabled
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-app-node
+  name: demo-app-go
   namespace: demo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-app-node
+      app: demo-app-go
   template:
     metadata:
       labels:
-        app: demo-app-node
+        app: demo-app-go
       annotations:
-        # Tells the otel-operator webhook to inject the Node.js auto-instrumentation init-container
-        instrumentation.opentelemetry.io/inject-nodejs: "demo-instrumentation-node"
+        # Tells the otel-operator webhook to inject the Go auto-instrumentation
+        # sidecar for this pod, using the Instrumentation CR named "demo-instrumentation-go"
+        instrumentation.opentelemetry.io/inject-go: "demo-instrumentation-go"
+        # Required for Go: the operator needs to know which container holds the binary
+        instrumentation.opentelemetry.io/otel-go-instrumentation-container: demo-app-go
+        # Exclude the Postgres port so Envoy doesn't intercept outbound connections to it.
+        traffic.sidecar.istio.io/excludeOutboundPorts: "5432"
     spec:
       containers:
-        - name: demo-app-node
-          image: ghcr.io/tom-ludwig/otel-kyma-instrumentation-evaluation:0.0.2-node
+        - name: demo-app-go
+          image: ghcr.io/tom-ludwig/otel-kyma-instrumentation-evaluation:0.0.2-golang
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
             - name: PG_HOST
-              value: postgres
+              value: postgres-go
             - name: PG_USER
               value: postgres
             - name: PG_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
+                  name: postgres-go-secret
                   key: password
+          # Go auto-instrumentation uses eBPF (no code change),
+          # but the sidecar still needs these privileges
+          securityContext:
+            runAsUser: 0
           resources:
             requests:
               cpu: 50m
@@ -43,20 +59,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: demo-app-node
+  name: demo-app-go
   namespace: demo
 spec:
   selector:
-    app: demo-app-node
+    app: demo-app-go
   ports:
     - port: 8080
       targetPort: 8080
 ---
-# Minimal Postgres for the DB span
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgres-secret
+  name: postgres-go-secret
   namespace: demo
 type: Opaque
 stringData:
@@ -65,23 +80,23 @@ stringData:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: postgres-go
   namespace: demo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: postgres-go
   template:
     metadata:
       labels:
-        app: postgres
+        app: postgres-go
       annotations:
         # Exclude the Postgres port so Envoy doesn't intercept it; Istio cannot handle the Postgres wire protocol.
         traffic.sidecar.istio.io/excludeInboundPorts: "5432"
     spec:
       containers:
-        - name: postgres
+        - name: postgres-go
           image: postgres:16-alpine
           ports:
             - containerPort: 5432
@@ -89,7 +104,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
+                  name: postgres-go-secret
                   key: password
           resources:
             requests:
@@ -102,11 +117,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: postgres-go
   namespace: demo
 spec:
   selector:
-    app: postgres
+    app: postgres-go
   ports:
     # Port name prefix "tcp-" tells Istio this is a plain TCP (non-HTTP) port,
     # so it skips HTTP protocol detection on the Postgres connection.
@@ -117,10 +132,11 @@ spec:
 apiVersion: opentelemetry.io/v1alpha1
 kind: Instrumentation
 metadata:
-  name: demo-instrumentation-node
+  name: demo-instrumentation-go
   namespace: demo
 spec:
   exporter:
+    # Go auto-instrumentation uses otlp/http-protobuf by default, so 4318 (HTTP) is required; not 4317 (gRPC)
     endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
   propagators:
     - tracecontext
@@ -128,12 +144,15 @@ spec:
   sampler:
     type: parentbased_traceidratio
     argument: "1"
-  nodejs: {}
+  go:
+    env:
+      - name: OTEL_GO_AUTO_TARGET_EXE
+        value: /demo-app
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
-  name: demo-node-gateway
+  name: demo-go-gateway
   namespace: demo
 spec:
   selector:
@@ -144,21 +163,21 @@ spec:
         name: http
         protocol: HTTP
       hosts:
-        - "demo-node.local"
+        - "demo-go.local"
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: demo-app-node
+  name: demo-app-go
   namespace: demo
 spec:
   hosts:
-    - "demo-node.local"
+    - "demo-go.local"
   gateways:
-    - demo-node-gateway
+    - demo-go-gateway
   http:
     - route:
         - destination:
-            host: demo-app-node
+            host: demo-app-go
             port:
               number: 8080

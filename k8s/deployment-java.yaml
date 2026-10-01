@@ -148,35 +148,18 @@ spec:
     - port: 8080
       targetPort: 8080
 ---
-apiVersion: networking.istio.io/v1beta1
-kind: Gateway
-metadata:
-  name: demo-java-gateway
-  namespace: demo
-spec:
-  selector:
-    istio: ingressgateway
-  servers:
-    - port:
-        number: 80
-        name: http
-        protocol: HTTP
-      hosts:
-        - "demo-java.local"
----
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: demo-app-java
   namespace: demo
 spec:
-  hosts:
+  parentRefs:
+    - name: demo-gateway
+      namespace: istio-system
+  hostnames:
     - "demo-java.local"
-  gateways:
-    - demo-java-gateway
-  http:
-    - route:
-        - destination:
-            host: demo-app-java
-            port:
-              number: 8080
+  rules:
+    - backendRefs:
+        - name: demo-app-java
+          port: 8080

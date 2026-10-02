@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-debug-collector
+  namespace: demo
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+
+    exporters:
+      debug:
+        verbosity: detailed
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [debug]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-debug-collector
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-debug-collector
+  template:
+    metadata:
+      labels:
+        app: otel-debug-collector
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector:latest
+          args: ["--config=/conf/config.yaml"]
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+          ports:
+            - containerPort: 4317
+      volumes:
+        - name: config
+          configMap:
+            name: otel-debug-collector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-debug-collector
+  namespace: demo
+spec:
+  selector:
+    app: otel-debug-collector
+  ports:
+    - port: 4317
+      targetPort: 4317

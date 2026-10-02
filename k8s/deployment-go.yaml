@@ -148,6 +148,13 @@ spec:
     env:
       - name: OTEL_GO_AUTO_TARGET_EXE
         value: /demo-app
+      # The database/sql probe exists but omits the SQL statement by default,
+      # so DB spans can look empty/missing. Include and parse the statement so
+      # the "SELECT 1" call from rolldice shows up as a child span.
+      - name: OTEL_GO_AUTO_INCLUDE_DB_STATEMENT
+        value: "true"
+      - name: OTEL_GO_AUTO_PARSE_DB_STATEMENT
+        value: "true"
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

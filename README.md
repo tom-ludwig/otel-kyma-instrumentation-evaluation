@@ -1,5 +1,7 @@
 # Demo app: OTel operator auto-instrumentation + Kyma managed collector
 
+This repo demonstrates automatic distributed tracing for three sample apps (Go, Node.js, Java) running on Kubernetes, without any code changes. It uses the OpenTelemetry Operator to inject instrumentation and Kyma's managed collector to forward traces to Jaeger.
+
 ## Prerequisites
 
 - **Cert-Manager**
@@ -7,14 +9,14 @@
 > [!WARNING]
 > Cert Manager values are tuned for a Gardener Shoot Cluster. Double-check if those values apply to you.
 
-  ```bash
-  helm install \
-    cert-manager oci://quay.io/jetstack/charts/cert-manager \
-    --namespace cert-manager \
-    --create-namespace \
-    --version v1.21.2 \
-    --values k8s/cert-manager-values.yaml
-  ```
+```bash
+helm install \
+  cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.21.2 \
+  --values k8s/cert-manager-values.yaml
+```
 
 - **OpenTelemetry Operator**
 
@@ -90,7 +92,8 @@ Then open http://localhost:16686.
 
 ### Go (eBPF)
 
-> **WARNING:** The Go eBPF auto-instrumentation sidecar requires `runAsUser: 0`.
+> [!WARNING]
+> The Go eBPF auto-instrumentation sidecar requires `runAsUser: 0`.
 > If your cluster enforces a restrictive PodSecurityAdmission policy, you must
 > allow privileged containers in the `demo` namespace before deploying.
 

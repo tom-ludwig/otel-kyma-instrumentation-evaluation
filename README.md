@@ -4,8 +4,8 @@
 
 - **Cert-Manager**
 
-  > [!WARNING] Cert-manager Values
-  > Cert Manager values are tuned for a Gardener Shoot Cluster. Double-check if those values apply to you.
+> [!WARNING]
+> Cert Manager values are tuned for a Gardener Shoot Cluster. Double-check if those values apply to you.
 
   ```bash
   helm install \

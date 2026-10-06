@@ -128,7 +128,12 @@ spec:
   sampler:
     type: parentbased_traceidratio
     argument: "1"
-  nodejs: {}
+  nodejs:
+    resourceRequirements:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

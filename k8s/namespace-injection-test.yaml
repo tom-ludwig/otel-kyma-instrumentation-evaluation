@@ -1,8 +1,48 @@
+---
+# Namespace with injection annotation: all pods here get auto-instrumented
+# without needing per-pod annotations.
+# The annotation value "true" picks up the Instrumentation CR named
+# "default" in this namespace (or the only CR if there is exactly one).
+# To target a specific CR: "ns-inject-test/demo-instrumentation-ns"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-inject-test
+  labels:
+    istio-injection: enabled
+  annotations:
+    instrumentation.opentelemetry.io/inject-java: "true"
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: default
+  namespace: ns-inject-test
+spec:
+  exporter:
+    endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  java:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    env:
+      - name: OTEL_METRICS_EXPORTER
+        value: none
+      - name: OTEL_LOGS_EXPORTER
+        value: none
+---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgres-java-secret
-  namespace: demo
+  name: postgres-ns-test-secret
+  namespace: ns-inject-test
 type: Opaque
 stringData:
   password: postgres
@@ -10,20 +50,21 @@ stringData:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres-java
-  namespace: demo
+  name: postgres-ns-test
+  namespace: ns-inject-test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres-java
+      app: postgres-ns-test
   template:
     metadata:
       labels:
-        app: postgres-java
+        app: postgres-ns-test
       annotations:
-        # Postgres is a server-first protocol; skip Istio interception on this port
         traffic.sidecar.istio.io/excludeInboundPorts: "5432"
+        # Opt out of namespace-level injection for Postgres: it doesn't need tracing
+        # instrumentation.opentelemetry.io/inject-java: "false"
     spec:
       containers:
         - name: postgres
@@ -34,7 +75,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-java-secret
+                  name: postgres-ns-test-secret
                   key: password
           resources:
             requests:
@@ -47,76 +88,49 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-java
-  namespace: demo
+  name: postgres-ns-test
+  namespace: ns-inject-test
 spec:
   selector:
-    app: postgres-java
+    app: postgres-ns-test
   ports:
     - name: tcp-postgres
       port: 5432
       targetPort: 5432
 ---
-apiVersion: opentelemetry.io/v1alpha1
-kind: Instrumentation
-metadata:
-  name: demo-instrumentation-java
-  namespace: demo
-spec:
-  exporter:
-    endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
-  propagators:
-    - tracecontext
-    - baggage
-  sampler:
-    type: parentbased_traceidratio
-    argument: "0"
-  java:
-    resources:
-      limits:
-        cpu: 200m
-        memory: 256Mi
-    env:
-      # The Java agent enables metrics and logs exporters by default; disable them
-      # since Kyma's telemetry-otlp-traces only accepts /v1/traces (not /v1/metrics or /v1/logs).
-      - name: OTEL_METRICS_EXPORTER
-        value: none
-      - name: OTEL_LOGS_EXPORTER
-        value: none
----
+# No injection annotations on the pod: it inherits from the namespace
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-app-java
-  namespace: demo
+  name: demo-app-ns-test
+  namespace: ns-inject-test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-app-java
+      app: demo-app-ns-test
   template:
     metadata:
       labels:
-        app: demo-app-java
+        app: demo-app-ns-test
       annotations:
-        instrumentation.opentelemetry.io/inject-java: "demo-instrumentation-java"
-        traffic.sidecar.istio.io/excludeOutboundPorts: "5432"
+        # traffic.sidecar.istio.io/excludeOutboundPorts: "5432"
     spec:
       containers:
-        - name: demo-app-java
+        - name: demo-app-ns-test
           image: ghcr.io/tom-ludwig/otel-kyma-instrumentation-evaluation:0.0.1-java
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
             - name: PG_HOST
-              value: postgres-java
+              value: postgres-ns-test
             - name: PG_USER
               value: postgres
             - name: PG_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-java-secret
+                  name: postgres-ns-test-secret
                   key: password
           startupProbe:
             httpGet:
@@ -134,18 +148,18 @@ spec:
             requests:
               cpu: 100m
               memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+            # limits:
+            #   cpu: 500m
+            #   memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: demo-app-java
-  namespace: demo
+  name: demo-app-ns-test
+  namespace: ns-inject-test
 spec:
   selector:
-    app: demo-app-java
+    app: demo-app-ns-test
   ports:
     - port: 8080
       targetPort: 8080
@@ -153,15 +167,15 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: demo-app-java
-  namespace: demo
+  name: demo-app-ns-test
+  namespace: ns-inject-test
 spec:
   parentRefs:
     - name: demo-gateway
       namespace: istio-system
   hostnames:
-    - "demo-java.local"
+    - "demo-ns-test.local"
   rules:
     - backendRefs:
-        - name: demo-app-java
+        - name: demo-app-ns-test
           port: 8080

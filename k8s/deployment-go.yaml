@@ -145,6 +145,10 @@ spec:
     type: parentbased_traceidratio
     argument: "1"
   go:
+    resourceRequirements:
+      limits:
+        cpu: 200m
+        memory: 128Mi
     env:
       - name: OTEL_GO_AUTO_TARGET_EXE
         value: /demo-app

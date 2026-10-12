@@ -2,6 +2,8 @@
 
 This repo demonstrates automatic distributed tracing for three sample apps (Go, Node.js, Java) running on Kubernetes, without any code changes. It uses the OpenTelemetry Operator to inject instrumentation and Kyma's managed collector to forward traces to Jaeger.
 
+![Architecture sketch of how auto-instrumentation works with kyma telemetry module](./otel-operator-auto-instrumentation.drawio.svg)
+
 ## Prerequisites
 
 - **Cert-Manager**
